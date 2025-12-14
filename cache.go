@@ -26,7 +26,7 @@ func (f *structFieldCacheT) load(k reflect.Type) ([]structFieldElem, error) {
 	for i := 0; i < numField; i++ {
 		field := k.Field(i)
 		if field.PkgPath != "" {
-			return nil, fmt.Errorf("struct contains unexported fields : " + field.PkgPath)
+			return nil, fmt.Errorf("struct contains unexported fields : %s", field.PkgPath)
 		}
 
 		result = append(result, structFieldElem{
