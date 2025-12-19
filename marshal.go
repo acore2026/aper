@@ -32,7 +32,7 @@ func (pd *perRawBitData) bitCarry() {
 func (pd *perRawBitData) appendAlignBits() {
 	if alignBits := uint64(8-pd.bitsOffset&0x7) & 0x7; alignBits != 0 {
 		perTrace(2, "Aligning %d bits", alignBits)
-		perTrace(1, perRawBitLog(alignBits, len(pd.bytes), 0, []byte{0x00}))
+		perTrace(1, "%s", perRawBitLog(alignBits, len(pd.bytes), 0, []byte{0x00}))
 	}
 	pd.bitsOffset = 0
 }
@@ -44,7 +44,7 @@ func (pd *perRawBitData) putBitString(bytes []byte, numBits uint) error {
 	if pd.bitsOffset == 0 {
 		pd.bytes = append(pd.bytes, bytes...)
 		pd.bitsOffset = (numBits & 0x7)
-		perTrace(1, perRawBitLog(uint64(numBits), len(pd.bytes), pd.bitsOffset, bytes))
+		perTrace(1, "%s", perRawBitLog(uint64(numBits), len(pd.bytes), pd.bitsOffset, bytes))
 		return err
 	}
 	bitsLeft := 8 - pd.bitsOffset
@@ -63,7 +63,7 @@ func (pd *perRawBitData) putBitString(bytes []byte, numBits uint) error {
 	}
 	pd.bitsOffset = (numBits & 0x7) + pd.bitsOffset
 	pd.bitCarry()
-	perTrace(1, perRawBitLog(uint64(numBits), len(pd.bytes), pd.bitsOffset, bytes))
+	perTrace(1, "%s", perRawBitLog(uint64(numBits), len(pd.bytes), pd.bitsOffset, bytes))
 	return err
 }
 
@@ -84,7 +84,7 @@ func (pd *perRawBitData) putBitsValue(value uint64, numBits uint) error {
 	var i int
 	for i = int(Byteslen) - 2; value > 0; i-- {
 		if i < 0 {
-			err = fmt.Errorf("Bits Value is over capacity")
+			err = fmt.Errorf("bits value is over capacity")
 			return err
 		}
 		tempBytes[i] = byte(value & 0xff)
@@ -102,7 +102,7 @@ func (pd *perRawBitData) appendConstraintValue(valueRange int64, value uint64) e
 	var bytes uint
 	if valueRange <= 255 {
 		if valueRange < 0 {
-			err = fmt.Errorf("Value range is negative")
+			err = fmt.Errorf("value range is negative")
 			return err
 		}
 		var i uint
@@ -120,7 +120,7 @@ func (pd *perRawBitData) appendConstraintValue(valueRange int64, value uint64) e
 	} else if valueRange <= 65536 {
 		bytes = 2
 	} else {
-		err = fmt.Errorf("Constraint Value is large than 65536")
+		err = fmt.Errorf("constraint value is large than 65536")
 		return err
 	}
 	pd.appendAlignBits()
@@ -234,7 +234,7 @@ func (pd *perRawBitData) appendBitString(bytes []byte, bitsLength uint64, extens
 			pd.appendAlignBits()
 			pd.bytes = append(pd.bytes, bytes...)
 			pd.bitsOffset = uint(ub & 0x7)
-			perTrace(1, perRawBitLog(bitsLength, len(pd.bytes), pd.bitsOffset, bytes))
+			perTrace(1, "%s", perRawBitLog(bitsLength, len(pd.bytes), pd.bitsOffset, bytes))
 		} else {
 			err = pd.putBitString(bytes, uint(bitsLength))
 		}
@@ -263,7 +263,7 @@ func (pd *perRawBitData) appendBitString(bytes []byte, bitsLength uint64, extens
 		}
 		pd.appendAlignBits()
 		pd.bytes = append(pd.bytes, bytes[byteOffset:byteOffset+sizes]...)
-		perTrace(1, perRawBitLog(partOfRawLength, len(pd.bytes), pd.bitsOffset, bytes))
+		perTrace(1, "%s", perRawBitLog(partOfRawLength, len(pd.bytes), pd.bitsOffset, bytes))
 		perTrace(2, "Encoded BIT STRING (length = %d): 0x%0x", partOfRawLength,
 			bytes[byteOffset:byteOffset+sizes])
 		rawLength -= (partOfRawLength - uint64(lb))
@@ -322,7 +322,7 @@ func (pd *perRawBitData) appendOctetString(bytes []byte, extensive bool, lowerBo
 		if byteLen > 2 {
 			pd.appendAlignBits()
 			pd.bytes = append(pd.bytes, bytes...)
-			perTrace(1, perRawBitLog(byteLen*8, len(pd.bytes), 0, bytes))
+			perTrace(1, "%s", perRawBitLog(byteLen*8, len(pd.bytes), 0, bytes))
 		} else {
 			err := pd.putBitString(bytes, uint(byteLen*8))
 			return err
@@ -351,7 +351,7 @@ func (pd *perRawBitData) appendOctetString(bytes []byte, extensive bool, lowerBo
 		}
 		pd.appendAlignBits()
 		pd.bytes = append(pd.bytes, bytes[byteOffset:byteOffset+partOfRawLength]...)
-		perTrace(1, perRawBitLog(partOfRawLength*8, len(pd.bytes), pd.bitsOffset, bytes))
+		perTrace(1, "%s", perRawBitLog(partOfRawLength*8, len(pd.bytes), pd.bitsOffset, bytes))
 		perTrace(2, "Encoded OCTET STRING (length = %d): 0x%0x", partOfRawLength,
 			bytes[byteOffset:byteOffset+partOfRawLength])
 		rawLength -= (partOfRawLength - uint64(lb))
@@ -446,7 +446,7 @@ func (pd *perRawBitData) appendInteger(value int64, extensive bool, lowerBoundPt
 		pd.bytes = append(pd.bytes, byte(rawLength))
 		perTrace(2, "Encoding INTEGER Length %d in one byte", rawLength)
 
-		perTrace(1, perRawBitLog(8, len(pd.bytes), pd.bitsOffset, uint64(rawLength)))
+		perTrace(1, "%s", perRawBitLog(8, len(pd.bytes), pd.bitsOffset, uint64(rawLength)))
 	} else {
 		// valueRange > 65536
 		var byteLen uint
@@ -552,7 +552,7 @@ func (pd *perRawBitData) parseSequenceOf(v reflect.Value, params fieldParameters
 	} else if sizeRange == 1 {
 		perTrace(3, "Encoding Length of \"SEQUENCE OF\"  with fix-size %d", ub)
 		if numElements != ub {
-			return fmt.Errorf("Encoding Length %d != fix-size %d", numElements, ub)
+			return fmt.Errorf("encoding Length %d != fix-size %d", numElements, ub)
 		}
 	} else if sizeRange > 0 {
 		perTrace(3, "Encoding Length(%d) of \"SEQUENCE OF\"  with Size Range(%d..%d)", numElements, lb, ub)
@@ -563,7 +563,7 @@ func (pd *perRawBitData) parseSequenceOf(v reflect.Value, params fieldParameters
 		perTrace(3, "Encoding Length(%d) of \"SEQUENCE OF\" with Semi-Constraint Range(%d..)", numElements, lb)
 		pd.appendAlignBits()
 		pd.bytes = append(pd.bytes, byte(numElements&0xff))
-		perTrace(1, perRawBitLog(8, len(pd.bytes), pd.bitsOffset, uint64(numElements)))
+		perTrace(1, "%s", perRawBitLog(8, len(pd.bytes), pd.bitsOffset, uint64(numElements)))
 	}
 	perTrace(2, "Encoding  \"SEQUENCE OF\" struct %s with len(%d)", v.Type().Elem().Name(), numElements)
 	params.sizeExtensible = false
@@ -581,11 +581,11 @@ func (pd *perRawBitData) appendChoiceIndex(present int, extensive bool, upperBou
 	var ub int64
 	rawChoice := present - 1
 	if upperBoundPtr == nil {
-		return fmt.Errorf("The upper bound of CHIOCE is missing")
+		return fmt.Errorf("the upper bound of CHOICE is missing")
 	} else if ub = *upperBoundPtr; ub < 0 {
-		return fmt.Errorf("The upper bound of CHIOCE is negative")
+		return fmt.Errorf("the upper bound of CHOICE is negative")
 	} else if extensive && rawChoice > int(ub) {
-		return fmt.Errorf("Unsupport value of CHOICE type is in Extensed")
+		return fmt.Errorf("unsupported value of CHOICE type is in Extensed")
 	}
 	perTrace(2, "Encoding Present index of CHOICE  %d - 1", present)
 	if err := pd.appendConstraintValue(ub+1, uint64(rawChoice)); err != nil {
@@ -623,7 +623,7 @@ func (pd *perRawBitData) appendOpenType(v reflect.Value, params fieldParameters)
 		}
 		pd.appendAlignBits()
 		pd.bytes = append(pd.bytes, openTypeBytes[byteOffset:byteOffset+partOfRawLength]...)
-		perTrace(1, perRawBitLog(partOfRawLength*8, len(pd.bytes), pd.bitsOffset, openTypeBytes))
+		perTrace(1, "%s", perRawBitLog(partOfRawLength*8, len(pd.bytes), pd.bitsOffset, openTypeBytes))
 		perTrace(2, "Encoded OpenType RawData (length = %d): 0x%0x", partOfRawLength,
 			openTypeBytes[byteOffset:byteOffset+partOfRawLength])
 		rawLength -= partOfRawLength
@@ -659,7 +659,7 @@ func (pd *perRawBitData) makeField(v reflect.Value, params fieldParameters) erro
 			params.sizeUpperBound)
 		return err
 	case ObjectIdentifierType:
-		err := fmt.Errorf("Unsupport ObjectIdenfier type")
+		err := fmt.Errorf("unsupported ObjectIdentifier type")
 		return err
 	case OctetStringType:
 		err := pd.appendOctetString(v.Bytes(), params.sizeExtensible, params.sizeLowerBound, params.sizeUpperBound)
@@ -722,7 +722,7 @@ func (pd *perRawBitData) makeField(v reflect.Value, params fieldParameters) erro
 			if present == 0 {
 				return fmt.Errorf("CHOICE or OpenType present is 0(present's field number)")
 			} else if present >= len(structField) {
-				return fmt.Errorf("Present is bigger than number of struct field")
+				return fmt.Errorf("present is bigger than number of struct field")
 			} else if params.openType {
 				if params.referenceFieldValue == nil {
 					return fmt.Errorf("OpenType reference value is empty")
@@ -770,7 +770,7 @@ func (pd *perRawBitData) makeField(v reflect.Value, params fieldParameters) erro
 					}
 				}
 				if index == i {
-					return fmt.Errorf("Open type is not reference to the other field in the struct")
+					return fmt.Errorf("open type is not reference to the other field in the struct")
 				}
 				tempFieldParameters.referenceFieldValue = new(int64)
 				if value, err := getReferenceFieldValue(val.Field(index)); err != nil {
@@ -794,7 +794,7 @@ func (pd *perRawBitData) makeField(v reflect.Value, params fieldParameters) erro
 			params.sizeUpperBound)
 		return err
 	}
-	return fmt.Errorf("unsupported: " + v.Type().String())
+	return fmt.Errorf("unsupported: %s", v.Type().String())
 }
 
 // Marshal returns the ASN.1 encoding of val.
