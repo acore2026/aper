@@ -421,6 +421,31 @@ func (pd *perBitData) parseOctetString(extensed bool, lowerBoundPtr *int64, uppe
 	return octetString, nil
 }
 
+func (pd *perBitData) parsePrintableString(extensed bool, lowerBoundPtr *int64, upperBoundPtr *int64) (string, error) {
+	octetString, err := pd.parseOctetString(extensed, lowerBoundPtr, upperBoundPtr)
+	if err != nil {
+		return "", err
+	}
+	// X.680 37.4 Table 8 – PrintableString
+	for i, b := range octetString {
+		ok := false
+		switch b {
+		case 0x20, 0x27, 0x28, 0x29, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x3A, 0x3D, 0x3F:
+			ok = true
+		default:
+			if (b >= '0' && b <= '9') || (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') {
+				ok = true
+			}
+		}
+		if !ok {
+			logger.AperLog.Warnf("Invalid PrintableString: illegal byte 0x%02x at pos %d", b, i)
+			perTrace(1, "Ignored PrintableString due to illegal byte 0x%02x at pos %d", b, i)
+			return "", nil
+		}
+	}
+	return string(octetString), nil
+}
+
 func (pd *perBitData) parseBool() (value bool, err error) {
 	perTrace(3, "Decoding BOOLEAN Value")
 	bit, err1 := pd.getBitsValue(1)
@@ -886,14 +911,13 @@ func parseField(v reflect.Value, pd *perBitData, params fieldParameters) error {
 	case reflect.String:
 		perTrace(2, "Decoding PrintableString using Octet String decoding method")
 
-		if octetString, err := pd.parseOctetString(sizeExtensible, params.sizeLowerBound, params.sizeUpperBound); err != nil {
+		printableString, err := pd.parsePrintableString(sizeExtensible, params.sizeLowerBound, params.sizeUpperBound)
+		if err != nil {
 			return err
-		} else {
-			printableString := string(octetString)
-			val.SetString(printableString)
-			perTrace(2, "Decoded PrintableString : \"%s\"", printableString)
-			return nil
 		}
+		val.SetString(printableString)
+		perTrace(2, "Decoded PrintableString : \"%s\"", printableString)
+		return nil
 	}
 	return fmt.Errorf("unsupported: %s", v.Type().String())
 }
