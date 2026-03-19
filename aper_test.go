@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/free5gc/aper/logger"
+	"github.com/acore2026/aper/logger"
 )
 
 var perTestTraceLevel = 2

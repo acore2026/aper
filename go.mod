@@ -1,4 +1,4 @@
-module github.com/free5gc/aper
+module github.com/acore2026/aper
 
 go 1.25.5
 
