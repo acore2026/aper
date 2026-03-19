@@ -235,7 +235,7 @@ type oCTETStringTest1 struct {
 }
 
 var oCTETStringTest1Data = []oCTETStringTest1{
-	{OctetString("free5GC")},
+	{OctetString("acore2026")},
 	{OctetString("\x23\x34\x52\x97")},
 	{OctetString("Jennifer")},
 }
@@ -302,7 +302,7 @@ type oCTETStringTest7 struct {
 
 var oCTETStringTest7Data = []oCTETStringTest7{
 	{OctetString("a")},
-	{OctetString("free5GC")},
+	{OctetString("acore2026")},
 }
 
 // oCTETStringTest8 is for 65537 <= (lmax-lmin+1)
@@ -318,7 +318,7 @@ var oCTETStringTest8Data = []oCTETStringTest8{
 }
 
 var singleOctetStringTestData = []testData{
-	{[]byte("\x07free5GC"), oCTETStringTest1Data[0]},
+	{[]byte("\x07acore2026"), oCTETStringTest1Data[0]},
 	{[]byte("\x04\x23\x34\x52\x97"), oCTETStringTest1Data[1]},
 	{[]byte("\x08Jennifer"), oCTETStringTest1Data[2]},
 	{[]byte("\xaa\x56"), oCTETStringTest2Data[0]},
@@ -341,7 +341,7 @@ var singleOctetStringTestData = []testData{
 	{[]byte("\x00\x12iClFlb&YgrS4basdas"), oCTETStringTest6Data[2]},
 	{[]byte("\x00\x07wirelab"), oCTETStringTest6Data[3]},
 	{[]byte("\x30\x80"), oCTETStringTest7Data[0]},
-	{[]byte("\x80\x07free5GC"), oCTETStringTest7Data[1]},
+	{[]byte("\x80\x07acore2026"), oCTETStringTest7Data[1]},
 	{[]byte("\x0EI!nGUXiqNpCP&a"), oCTETStringTest8Data[0]},
 	{[]byte(bigOctetData), oCTETStringTest8Data[1]},
 }
