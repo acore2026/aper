@@ -13,6 +13,12 @@ type perBitData struct {
 	bytes      []byte
 	byteOffset uint64
 	bitsOffset uint
+	baseBit    uint64
+	trace      *decodeTrace
+}
+
+func (pd *perBitData) bitOffset() uint64 {
+	return pd.baseBit + pd.byteOffset*8 + uint64(pd.bitsOffset)
 }
 
 func perTrace(level int, format string, a ...interface{}) {
@@ -579,7 +585,7 @@ func (pd *perBitData) parseEnumerated(extensed bool, lowerBoundPtr *int64, upper
 	return
 }
 
-func (pd *perBitData) parseSequenceOf(sizeExtensed bool, params fieldParameters, sliceType reflect.Type) (
+func (pd *perBitData) parseSequenceOf(sizeExtensed bool, params fieldParameters, sliceType reflect.Type, path string) (
 	reflect.Value, error,
 ) {
 	var sliceContent reflect.Value
@@ -626,7 +632,7 @@ func (pd *perBitData) parseSequenceOf(sizeExtensed bool, params fieldParameters,
 	intNumElements := int(numElements)
 	sliceContent = reflect.MakeSlice(sliceType, intNumElements, intNumElements)
 	for i := 0; i < intNumElements; i++ {
-		err := parseField(sliceContent.Index(i), pd, params)
+		err := parseFieldAt(sliceContent.Index(i), pd, params, decodeChildPath(path, fmt.Sprintf("[%d]", i)))
 		if err != nil {
 			return sliceContent, err
 		}
@@ -674,8 +680,10 @@ func getReferenceFieldValue(v reflect.Value) (value int64, err error) {
 	return
 }
 
-func (pd *perBitData) parseOpenType(skip bool, v reflect.Value, params fieldParameters) error {
-	pdOpenType := &perBitData{[]byte(""), 0, 0}
+func (pd *perBitData) parseOpenType(skip bool, v reflect.Value, params fieldParameters, path string) error {
+	var openTypeBytes []byte
+	var firstContentBit uint64
+	fragmentCount := 0
 	repeat := false
 	for {
 		var rawLength uint64
@@ -692,7 +700,11 @@ func (pd *perBitData) parseOpenType(skip bool, v reflect.Value, params fieldPara
 		if (rawLength + pd.byteOffset) > uint64(len(pd.bytes)) {
 			return fmt.Errorf("per data out of range ")
 		}
-		pdOpenType.bytes = append(pdOpenType.bytes, pd.bytes[pd.byteOffset:pd.byteOffset+rawLength]...)
+		if fragmentCount == 0 {
+			firstContentBit = pd.bitOffset()
+		}
+		fragmentCount++
+		openTypeBytes = append(openTypeBytes, pd.bytes[pd.byteOffset:pd.byteOffset+rawLength]...)
 		pd.byteOffset += rawLength
 
 		if !repeat {
@@ -702,12 +714,18 @@ func (pd *perBitData) parseOpenType(skip bool, v reflect.Value, params fieldPara
 			break
 		}
 	}
+	pdOpenType := &perBitData{bytes: openTypeBytes, baseBit: firstContentBit}
+	// A fragmented open type is copied from non-contiguous source ranges. Its
+	// nested fields therefore cannot be represented by one absolute span.
+	if fragmentCount <= 1 {
+		pdOpenType.trace = pd.trace
+	}
 	if skip {
 		perTrace(2, "Skip OpenType (len = %d byte)", len(pdOpenType.bytes))
 		return nil
 	} else {
 		perTrace(2, "Decoding OpenType %s with (len = %d byte)", v.Type().String(), len(pdOpenType.bytes))
-		err := parseField(v, pdOpenType, params)
+		err := parseFieldAt(v, pdOpenType, params, path)
 		perTrace(2, "Decoded OpenType %s", v.Type().String())
 		return err
 	}
@@ -716,7 +734,7 @@ func (pd *perBitData) parseOpenType(skip bool, v reflect.Value, params fieldPara
 // parseField is the main parsing function. Given a byte slice and an offset
 // into the array, it will try to parse a suitable ASN.1 value out and store it
 // in the given Value. TODO : ObjectIdenfier, handle extension Field
-func parseField(v reflect.Value, pd *perBitData, params fieldParameters) error {
+func parseFieldAt(v reflect.Value, pd *perBitData, params fieldParameters, path string) (err error) {
 	fieldType := v.Type()
 
 	// If we have run out of data return error.
@@ -726,7 +744,15 @@ func parseField(v reflect.Value, pd *perBitData, params fieldParameters) error {
 	if v.Kind() == reflect.Ptr {
 		ptr := reflect.New(fieldType.Elem())
 		v.Set(ptr)
-		return parseField(v.Elem(), pd, params)
+		return parseFieldAt(v.Elem(), pd, params, path)
+	}
+	if pd.trace != nil {
+		startBit := pd.bitOffset()
+		defer func() {
+			if err == nil {
+				pd.trace.record(path, startBit, pd.bitOffset())
+			}
+		}()
 	}
 	sizeExtensible := false
 	valueExtensible := false
@@ -840,19 +866,22 @@ func parseField(v reflect.Value, pd *perBitData, params fieldParameters) error {
 				if present == 0 {
 					val.Field(0).SetInt(0)
 					perTrace(2, "OpenType reference value does not match any field")
-					return pd.parseOpenType(true, reflect.Value{}, fieldParameters{})
+					return pd.parseOpenType(true, reflect.Value{}, fieldParameters{}, "")
 				} else if present >= len(structField) {
 					return fmt.Errorf("OpenType Present is bigger than number of struct field")
 				} else {
 					val.Field(0).SetInt(int64(present))
 					perTrace(2, "Decoded Present index of OpenType is %d ", present)
-					return pd.parseOpenType(false, val.Field(present), structField[present].FieldParameters)
+					return pd.parseOpenType(false, val.Field(present), structField[present].FieldParameters,
+						decodeChildPath(path, structField[present].FieldName))
 				}
 			} else {
-				if presentTmp, err := pd.getChoiceIndex(valueExtensible, params.valueUpperBound); err != nil {
+				presentStartBit := pd.bitOffset()
+				if presentTmp, choiceErr := pd.getChoiceIndex(valueExtensible, params.valueUpperBound); choiceErr != nil {
 					logger.AperLog.Errorf("pd.getChoiceIndex Error")
 				} else {
 					present = presentTmp
+					pd.trace.record(decodeChildPath(path, "Present"), presentStartBit, pd.bitOffset())
 				}
 				val.Field(0).SetInt(int64(present))
 				if present == 0 {
@@ -860,7 +889,8 @@ func parseField(v reflect.Value, pd *perBitData, params fieldParameters) error {
 				} else if present >= len(structField) {
 					return fmt.Errorf("CHOICE Present is bigger than number of struct field")
 				} else {
-					return parseField(val.Field(present), pd, structField[present].FieldParameters)
+					return parseFieldAt(val.Field(present), pd, structField[present].FieldParameters,
+						decodeChildPath(path, structField[present].FieldName))
 				}
 			}
 		}
@@ -895,14 +925,15 @@ func parseField(v reflect.Value, pd *perBitData, params fieldParameters) error {
 					*tempFieldParameters.referenceFieldValue = referenceFieldValue
 				}
 			}
-			if err := parseField(val.Field(i), pd, tempFieldParameters); err != nil {
+			if err := parseFieldAt(val.Field(i), pd, tempFieldParameters,
+				decodeChildPath(path, structField[i].FieldName)); err != nil {
 				return err
 			}
 		}
 		return nil
 	case reflect.Slice:
 		sliceType := fieldType
-		if newSlice, err := pd.parseSequenceOf(sizeExtensible, params, sliceType); err != nil {
+		if newSlice, err := pd.parseSequenceOf(sizeExtensible, params, sliceType, path); err != nil {
 			return err
 		} else {
 			val.Set(newSlice)
@@ -975,6 +1006,17 @@ func Unmarshal(b []byte, value interface{}) error {
 // top-level element. The form of the params is the same as the field tags.
 func UnmarshalWithParams(b []byte, value interface{}, params string) error {
 	v := reflect.ValueOf(value).Elem()
-	pd := &perBitData{b, 0, 0}
-	return parseField(v, pd, parseFieldParameters(params))
+	pd := &perBitData{bytes: b}
+	return parseFieldAt(v, pd, parseFieldParameters(params), "")
+}
+
+// UnmarshalWithParamsAndTrace decodes b like UnmarshalWithParams and also
+// returns the exact bit ranges consumed by decoded fields. Existing callers
+// can continue to use Unmarshal or UnmarshalWithParams without tracing cost.
+func UnmarshalWithParamsAndTrace(b []byte, value interface{}, params string) ([]DecodeSpan, error) {
+	v := reflect.ValueOf(value).Elem()
+	trace := &decodeTrace{}
+	pd := &perBitData{bytes: b, trace: trace}
+	err := parseFieldAt(v, pd, parseFieldParameters(params), decodeRootPath(v))
+	return append([]DecodeSpan(nil), trace.spans...), err
 }

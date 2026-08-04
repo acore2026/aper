@@ -318,7 +318,7 @@ var oCTETStringTest8Data = []oCTETStringTest8{
 }
 
 var singleOctetStringTestData = []testData{
-	{[]byte("\x07acore2026"), oCTETStringTest1Data[0]},
+	{[]byte("\x09acore2026"), oCTETStringTest1Data[0]},
 	{[]byte("\x04\x23\x34\x52\x97"), oCTETStringTest1Data[1]},
 	{[]byte("\x08Jennifer"), oCTETStringTest1Data[2]},
 	{[]byte("\xaa\x56"), oCTETStringTest2Data[0]},
@@ -341,7 +341,7 @@ var singleOctetStringTestData = []testData{
 	{[]byte("\x00\x12iClFlb&YgrS4basdas"), oCTETStringTest6Data[2]},
 	{[]byte("\x00\x07wirelab"), oCTETStringTest6Data[3]},
 	{[]byte("\x30\x80"), oCTETStringTest7Data[0]},
-	{[]byte("\x80\x07acore2026"), oCTETStringTest7Data[1]},
+	{[]byte("\x80\x09acore2026"), oCTETStringTest7Data[1]},
 	{[]byte("\x0EI!nGUXiqNpCP&a"), oCTETStringTest8Data[0]},
 	{[]byte(bigOctetData), oCTETStringTest8Data[1]},
 }
